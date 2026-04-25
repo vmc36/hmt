@@ -174,7 +174,7 @@ function App() {
     const amountNeeded = Math.max(0, dollarEligibleCost - convertedUsd);
     const usdToBrlRate = gbpToBrlRate / gbpToUsdRate;
     const usdPurchaseCostBrl = usdAmount * usdToBrlRate;
-    const totalTripCostBrl = brlFixedTotal + dollarEligibleCostBrl + usdPurchaseCostBrl;
+    const totalTripCostBrl = brlFixedTotal + dollarEligibleCostBrl;
     const totalTripCostGbp = gbpToBrlRate ? totalTripCostBrl / gbpToBrlRate : 0;
     const amountNeededBrl = amountNeeded * gbpToBrlRate;
     const totalSavingTargetBrl = brlFixedTotal + usdPurchaseCostBrl + amountNeededBrl;
@@ -244,12 +244,6 @@ function App() {
         brl: toNumber(form.lodgingBrl),
         usd: totals.lodgingInGbp * gbpToUsd,
       },
-      {
-        label: "Compra de USD informada",
-        gbp: totals.usdPurchaseCostBrl / gbpToBrl,
-        brl: totals.usdPurchaseCostBrl,
-        usd: toNumber(form.usdAmount),
-      },
     ];
 
     const expenseRowsSorted: ExpenseRow[] = expenseRowsBase
@@ -282,6 +276,12 @@ function App() {
         gbp: totals.convertedUsd,
         brl: totals.convertedUsd * gbpToBrl,
         usd: totals.convertedUsd * gbpToUsd,
+      },
+      {
+        label: "Compra de USD informada",
+        gbp: totals.usdPurchaseCostBrl / gbpToBrl,
+        brl: totals.usdPurchaseCostBrl,
+        usd: toNumber(form.usdAmount),
       },
       {
         label: "Valor ainda necessário para dólar",
@@ -415,7 +415,7 @@ function App() {
             <article>
               <p>Custo total da viagem</p>
               <strong>{formatCurrency(totalCostBrl, "BRL")}</strong>
-              <p className="kpi-sub">Inclui também o valor informado para compra de USD.</p>
+              <p className="kpi-sub">Não soma a compra de USD separadamente para evitar duplicidade.</p>
               <p className="kpi-sub">{`≈ ${formatCurrency(totals.totalTripCostGbp, "GBP")} | ${formatCurrency(totalCostUsd, "USD")}`}</p>
             </article>
             <article>
