@@ -1,0 +1,262 @@
+:root {
+  --bg: #0d1117;
+  --bg-soft: #121826;
+  --card: rgba(18, 24, 38, 0.78);
+  --line: rgba(255, 255, 255, 0.12);
+  --text: #f5f8ff;
+  --muted: #a4b0c3;
+  --accent: #4dd0a8;
+  --danger: #ff6b7d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Manrope", system-ui, sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 10% 10%, #13213d 0%, transparent 55%),
+    radial-gradient(circle at 90% 85%, #123524 0%, transparent 45%),
+    var(--bg);
+  min-height: 100dvh;
+}
+
+.app-shell {
+  width: min(1060px, 92vw);
+  margin: 2.5rem auto;
+  position: relative;
+  animation: rise 0.45s ease-out;
+}
+
+.bg-orb {
+  position: fixed;
+  width: 24rem;
+  height: 24rem;
+  filter: blur(70px);
+  z-index: -1;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.orb-a {
+  background: #2cb5ff;
+  top: -8rem;
+  left: -5rem;
+}
+
+.orb-b {
+  background: #4dd0a8;
+  right: -4rem;
+  bottom: -8rem;
+}
+
+.hero h1 {
+  margin: 0.3rem 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  color: var(--accent);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+  max-width: 64ch;
+}
+
+.grid {
+  margin-top: 1.2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 1.1rem;
+  backdrop-filter: blur(14px);
+}
+
+.card h2 {
+  margin: 0 0 0.85rem;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.1rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+input {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 0.72rem;
+  color: var(--text);
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input:focus {
+  outline: none;
+  border-color: color-mix(in oklab, var(--accent) 65%, white 35%);
+  box-shadow: 0 0 0 3px rgba(77, 208, 168, 0.2);
+}
+
+.rate {
+  margin: 0 0 0.8rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+}
+
+.kpis article {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.kpis p {
+  margin: 0;
+  font-size: 0.77rem;
+  color: var(--muted);
+}
+
+.kpi-sub {
+  margin-top: 0.45rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.kpis strong {
+  margin-top: 0.35rem;
+  display: block;
+  font-size: 1.25rem;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.positive {
+  color: var(--danger);
+}
+
+.neutral {
+  color: var(--accent);
+}
+
+.meta {
+  margin: 0.95rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.totals-table-wrap {
+  margin-top: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.totals-table-title {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.totals-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.totals-table th,
+.totals-table td {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+}
+
+.totals-table th {
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+
+.totals-table tbody tr + tr td {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 960px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .form-grid,
+  .kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .span-2 {
+    grid-column: auto;
+  }
+
+  .app-shell {
+    margin-top: 1.4rem;
+  }
+}
