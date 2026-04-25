@@ -68,6 +68,12 @@ const formatCurrency = (value: number, currency: "GBP" | "USD" | "BRL") =>
     maximumFractionDigits: 2,
   }).format(value);
 
+const formatPercent = (value: number) =>
+  new Intl.NumberFormat("pt-BR", {
+    style: "percent",
+    maximumFractionDigits: 1,
+  }).format(value);
+
 const getMonthsUntilTarget = (targetMonth: number, targetYear: number) => {
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
@@ -79,6 +85,17 @@ const getMonthsUntilTarget = (targetMonth: number, targetYear: number) => {
 
 const toNumber = (value: number | "", fallback = 0) =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+type TableRow = {
+  label: string;
+  gbp: number;
+  brl: number;
+  usd: number;
+};
+
+type ExpenseRow = TableRow & {
+  shareOfTotal: number;
+};
 
 function App() {
   const [form, setForm] = useState<TripForm>(defaultValues);
@@ -185,11 +202,12 @@ function App() {
     };
   }, [form, gbpToBrlRate, gbpToUsdRate, targetInfo.monthsRemaining]);
 
-  const totalsInBrlAndUsd = useMemo(() => {
+  const tableData = useMemo(() => {
     const gbpToBrl = gbpToBrlRate;
     const gbpToUsd = gbpToUsdRate;
+    const totalCostBrlValue = totals.totalTripCostBrl;
 
-    return [
+    const expenseRowsBase: TableRow[] = [
       {
         label: "Transporte",
         gbp: totals.transportTotal,
@@ -215,16 +233,49 @@ function App() {
         usd: totals.shoppingTotal * gbpToUsd,
       },
       {
-        label: "Subtotal coberto com dólar (sem hotel/passagem)",
-        gbp: totals.dollarEligibleCost,
-        brl: totals.dollarEligibleCost * gbpToBrl,
-        usd: totals.dollarEligibleCost * gbpToUsd,
+        label: "Passagem",
+        gbp: totals.flightInGbp,
+        brl: toNumber(form.flightBrl),
+        usd: totals.flightInGbp * gbpToUsd,
+      },
+      {
+        label: "Hospedagem",
+        gbp: totals.lodgingInGbp,
+        brl: toNumber(form.lodgingBrl),
+        usd: totals.lodgingInGbp * gbpToUsd,
       },
       {
         label: "Compra de USD informada",
         gbp: totals.usdPurchaseCostBrl / gbpToBrl,
         brl: totals.usdPurchaseCostBrl,
         usd: toNumber(form.usdAmount),
+      },
+    ];
+
+    const expenseRowsSorted: ExpenseRow[] = expenseRowsBase
+      .map((row) => ({
+        ...row,
+        shareOfTotal: totalCostBrlValue > 0 ? row.brl / totalCostBrlValue : 0,
+      }))
+      .sort((a, b) => a.brl - b.brl);
+
+    const expenseRows: ExpenseRow[] = [
+      ...expenseRowsSorted,
+      {
+        label: "Custo total da viagem",
+        gbp: totals.totalTripCostGbp,
+        brl: totals.totalTripCostBrl,
+        usd: totals.totalTripCostGbp * gbpToUsd,
+        shareOfTotal: 1,
+      },
+    ];
+
+    const infoRows: TableRow[] = [
+      {
+        label: "Subtotal coberto com dólar (sem hotel/passagem)",
+        gbp: totals.dollarEligibleCost,
+        brl: totals.dollarEligibleCost * gbpToBrl,
+        usd: totals.dollarEligibleCost * gbpToUsd,
       },
       {
         label: "USD convertido para GBP",
@@ -239,18 +290,6 @@ function App() {
         usd: totals.amountNeeded * gbpToUsd,
       },
       {
-        label: "Passagem",
-        gbp: totals.flightInGbp,
-        brl: toNumber(form.flightBrl),
-        usd: totals.flightInGbp * gbpToUsd,
-      },
-      {
-        label: "Hospedagem",
-        gbp: totals.lodgingInGbp,
-        brl: toNumber(form.lodgingBrl),
-        usd: totals.lodgingInGbp * gbpToUsd,
-      },
-      {
         label: "Meta total para poupar",
         gbp: totals.totalSavingTargetBrl / gbpToBrl,
         brl: totals.totalSavingTargetBrl,
@@ -262,14 +301,10 @@ function App() {
         brl: totals.monthlySavingBrl,
         usd: totals.monthlySavingUsd,
       },
-      {
-        label: "Custo total da viagem",
-        gbp: totals.totalTripCostGbp,
-        brl: totals.totalTripCostBrl,
-        usd: totals.totalTripCostGbp * gbpToUsd,
-      },
     ];
-  }, [form.flightBrl, form.lodgingBrl, gbpToBrlRate, gbpToUsdRate, totals]);
+
+    return { expenseRows, infoRows };
+  }, [form.flightBrl, form.lodgingBrl, form.usdAmount, gbpToBrlRate, gbpToUsdRate, totals]);
 
   const totalCostBrl = totals.totalTripCostBrl;
   const totalCostUsd = totals.totalTripCostGbp * gbpToUsdRate;
@@ -406,7 +441,33 @@ function App() {
           </div>
 
           <div className="totals-table-wrap">
-            <p className="totals-table-title">Conferência por item (BRL e USD)</p>
+            <p className="totals-table-title">Gastos da viagem (ordenados do mais barato para o mais caro)</p>
+            <table className="totals-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>GBP</th>
+                  <th>BRL</th>
+                  <th>USD</th>
+                  <th>% do custo total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableData.expenseRows.map((row) => (
+                  <tr key={row.label}>
+                    <td>{row.label}</td>
+                    <td>{formatCurrency(row.gbp, "GBP")}</td>
+                    <td>{formatCurrency(row.brl, "BRL")}</td>
+                    <td>{formatCurrency(row.usd, "USD")}</td>
+                    <td>{formatPercent(row.shareOfTotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="totals-table-wrap">
+            <p className="totals-table-title">Informações de cálculo</p>
             <table className="totals-table">
               <thead>
                 <tr>
@@ -417,7 +478,7 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {totalsInBrlAndUsd.map((row) => (
+                {tableData.infoRows.map((row) => (
                   <tr key={row.label}>
                     <td>{row.label}</td>
                     <td>{formatCurrency(row.gbp, "GBP")}</td>
