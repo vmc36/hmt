@@ -7,6 +7,8 @@ type TripForm = {
   transportDaily: number | "";
   mealCost: number | "";
   mealsPerDay: number | "";
+  tripMonth: number | "";
+  tripYear: number | "";
   lodgingBrl: number | "";
   flightBrl: number | "";
   tickets: number | "";
@@ -29,18 +31,35 @@ const monthNames = [
   "dezembro",
 ];
 
+const getDefaultTripTarget = () => {
+  const now = new Date();
+  const defaultMonth = 11;
+  const defaultYear = now.getMonth() + 1 > defaultMonth ? now.getFullYear() + 1 : now.getFullYear();
+
+  return { defaultMonth, defaultYear };
+};
+
+const { defaultMonth, defaultYear } = getDefaultTripTarget();
+
 const defaultValues: TripForm = {
   people: 1,
   tripDays: 7,
   transportDaily: 12,
   mealCost: 18,
   mealsPerDay: 3,
+  tripMonth: defaultMonth,
+  tripYear: defaultYear,
   lodgingBrl: "",
   flightBrl: "",
   tickets: 160,
   shopping: 220,
   usdAmount: 1800,
 };
+
+const STORAGE_KEY = "help-my-trip:form-v1";
+const FIXED_GBP_TO_USD = 1.3493;
+const FIXED_GBP_TO_BRL = 6.7471;
+const FIXED_RATE_DATE = "2026-04-24";
 
 const formatCurrency = (value: number, currency: "GBP" | "USD" | "BRL") =>
   new Intl.NumberFormat("pt-BR", {
@@ -49,72 +68,67 @@ const formatCurrency = (value: number, currency: "GBP" | "USD" | "BRL") =>
     maximumFractionDigits: 2,
   }).format(value);
 
-function getMonthsUntilNovember() {
+const getMonthsUntilTarget = (targetMonth: number, targetYear: number) => {
   const now = new Date();
-  const targetMonth = 10;
-  let targetYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const diff = (targetYear - currentYear) * 12 + (targetMonth - currentMonth) + 1;
 
-  if (now.getMonth() > targetMonth) {
-    targetYear += 1;
-  }
-
-  const monthsRemaining =
-    (targetYear - now.getFullYear()) * 12 + (targetMonth - now.getMonth()) + 1;
-
-  return {
-    monthsRemaining: Math.max(1, monthsRemaining),
-    targetYear,
-  };
-}
+  return Math.max(1, diff);
+};
 
 const toNumber = (value: number | "", fallback = 0) =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
 function App() {
   const [form, setForm] = useState<TripForm>(defaultValues);
-  const [gbpToUsdRate, setGbpToUsdRate] = useState<number | null>(null);
-  const [gbpToBrlRate, setGbpToBrlRate] = useState<number | null>(null);
-  const [rateDate, setRateDate] = useState<string | null>(null);
-  const [rateError, setRateError] = useState<string | null>(null);
+  const [gbpToUsdRate] = useState<number>(FIXED_GBP_TO_USD);
+  const [gbpToBrlRate] = useState<number>(FIXED_GBP_TO_BRL);
+  const [rateDate] = useState<string>(FIXED_RATE_DATE);
 
   useEffect(() => {
-    const loadExchangeRate = async () => {
-      try {
-        setRateError(null);
-        const response = await fetch(
-          "https://api.frankfurter.app/latest?from=GBP&to=USD,BRL",
-          {
-            headers: { Accept: "application/json" },
-          }
-        );
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
 
-        if (!response.ok) {
-          throw new Error("Erro ao buscar cotação");
-        }
-
-        const data = (await response.json()) as { date?: string; rates?: { USD?: number; BRL?: number } };
-        const usdRate = data.rates?.USD;
-        const brlRate = data.rates?.BRL;
-
-        if (!usdRate || !brlRate) {
-          throw new Error("Cotação inválida");
-        }
-
-        setGbpToUsdRate(usdRate);
-        setGbpToBrlRate(brlRate);
-        setRateDate(data.date ?? null);
-      } catch {
-        setGbpToUsdRate(1.28);
-        setGbpToBrlRate(7.35);
-        setRateDate(null);
-        setRateError("Não foi possível carregar cotação ao vivo; usando taxa de segurança.");
-      }
-    };
-
-    void loadExchangeRate();
+    try {
+      const parsed = JSON.parse(saved) as Partial<TripForm>;
+      setForm({
+        people: typeof parsed.people === "number" || parsed.people === "" ? parsed.people : defaultValues.people,
+        tripDays: typeof parsed.tripDays === "number" || parsed.tripDays === "" ? parsed.tripDays : defaultValues.tripDays,
+        tripMonth: typeof parsed.tripMonth === "number" || parsed.tripMonth === "" ? parsed.tripMonth : defaultValues.tripMonth,
+        tripYear: typeof parsed.tripYear === "number" || parsed.tripYear === "" ? parsed.tripYear : defaultValues.tripYear,
+        transportDaily:
+          typeof parsed.transportDaily === "number" || parsed.transportDaily === ""
+            ? parsed.transportDaily
+            : defaultValues.transportDaily,
+        mealCost: typeof parsed.mealCost === "number" || parsed.mealCost === "" ? parsed.mealCost : defaultValues.mealCost,
+        mealsPerDay:
+          typeof parsed.mealsPerDay === "number" || parsed.mealsPerDay === "" ? parsed.mealsPerDay : defaultValues.mealsPerDay,
+        lodgingBrl:
+          typeof parsed.lodgingBrl === "number" || parsed.lodgingBrl === "" ? parsed.lodgingBrl : defaultValues.lodgingBrl,
+        flightBrl:
+          typeof parsed.flightBrl === "number" || parsed.flightBrl === "" ? parsed.flightBrl : defaultValues.flightBrl,
+        tickets: typeof parsed.tickets === "number" || parsed.tickets === "" ? parsed.tickets : defaultValues.tickets,
+        shopping: typeof parsed.shopping === "number" || parsed.shopping === "" ? parsed.shopping : defaultValues.shopping,
+        usdAmount: typeof parsed.usdAmount === "number" || parsed.usdAmount === "" ? parsed.usdAmount : defaultValues.usdAmount,
+      });
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   }, []);
 
-  const monthsInfo = useMemo(() => getMonthsUntilNovember(), []);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
+  }, [form]);
+
+  const targetInfo = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const targetMonth = Math.min(12, Math.max(1, Math.floor(toNumber(form.tripMonth, defaultMonth))));
+    const targetYear = Math.max(currentYear, Math.floor(toNumber(form.tripYear, defaultYear)));
+    const monthsRemaining = getMonthsUntilTarget(targetMonth, targetYear);
+
+    return { targetMonth, targetYear, monthsRemaining };
+  }, [form.tripMonth, form.tripYear]);
 
   const totals = useMemo(() => {
     const people = Math.max(1, Math.floor(toNumber(form.people, 1)));
@@ -134,16 +148,22 @@ function App() {
     const ticketsTotal = tickets * people;
     const shoppingTotal = shopping * people;
     const brlFixedTotal = flightBrl + lodgingBrl;
-    const brlFixedTotalInGbp = gbpToBrlRate ? brlFixedTotal / gbpToBrlRate : 0;
-    const totalCost = transportTotal + foodTotal + extrasTotal + brlFixedTotalInGbp;
+    const dollarEligibleCost = transportTotal + foodTotal + extrasTotal;
+    const dollarEligibleCostBrl = dollarEligibleCost * gbpToBrlRate;
     const flightInGbp = gbpToBrlRate ? flightBrl / gbpToBrlRate : 0;
     const lodgingInGbp = gbpToBrlRate ? lodgingBrl / gbpToBrlRate : 0;
 
     const convertedUsd = gbpToUsdRate ? usdAmount / gbpToUsdRate : 0;
-    const amountNeeded = Math.max(0, totalCost - convertedUsd);
-    const monthlySavingGbp = amountNeeded / monthsInfo.monthsRemaining;
-    const monthlySavingBrl = monthlySavingGbp * (gbpToBrlRate ?? 0);
-    const monthlySavingUsd = monthlySavingGbp * (gbpToUsdRate ?? 0);
+    const amountNeeded = Math.max(0, dollarEligibleCost - convertedUsd);
+    const usdToBrlRate = gbpToBrlRate / gbpToUsdRate;
+    const usdPurchaseCostBrl = usdAmount * usdToBrlRate;
+    const totalTripCostBrl = brlFixedTotal + dollarEligibleCostBrl + usdPurchaseCostBrl;
+    const totalTripCostGbp = gbpToBrlRate ? totalTripCostBrl / gbpToBrlRate : 0;
+    const amountNeededBrl = amountNeeded * gbpToBrlRate;
+    const totalSavingTargetBrl = brlFixedTotal + usdPurchaseCostBrl + amountNeededBrl;
+    const monthlySavingBrl = totalSavingTargetBrl / targetInfo.monthsRemaining;
+    const monthlySavingGbp = gbpToBrlRate ? monthlySavingBrl / gbpToBrlRate : 0;
+    const monthlySavingUsd = usdToBrlRate ? monthlySavingBrl / usdToBrlRate : 0;
 
     return {
       transportTotal,
@@ -152,18 +172,22 @@ function App() {
       shoppingTotal,
       flightInGbp,
       lodgingInGbp,
-      totalCost,
+      dollarEligibleCost,
+      totalTripCostBrl,
+      totalTripCostGbp,
       convertedUsd,
       amountNeeded,
+      usdPurchaseCostBrl,
+      totalSavingTargetBrl,
       monthlySavingGbp,
       monthlySavingBrl,
       monthlySavingUsd,
     };
-  }, [form, gbpToBrlRate, gbpToUsdRate, monthsInfo.monthsRemaining]);
+  }, [form, gbpToBrlRate, gbpToUsdRate, targetInfo.monthsRemaining]);
 
   const totalsInBrlAndUsd = useMemo(() => {
-    const gbpToBrl = gbpToBrlRate ?? 0;
-    const gbpToUsd = gbpToUsdRate ?? 0;
+    const gbpToBrl = gbpToBrlRate;
+    const gbpToUsd = gbpToUsdRate;
 
     return [
       {
@@ -191,22 +215,16 @@ function App() {
         usd: totals.shoppingTotal * gbpToUsd,
       },
       {
-        label: "Passagem",
-        gbp: totals.flightInGbp,
-        brl: totals.flightInGbp * gbpToBrl,
-        usd: totals.flightInGbp * gbpToUsd,
+        label: "Subtotal coberto com dólar (sem hotel/passagem)",
+        gbp: totals.dollarEligibleCost,
+        brl: totals.dollarEligibleCost * gbpToBrl,
+        usd: totals.dollarEligibleCost * gbpToUsd,
       },
       {
-        label: "Hospedagem",
-        gbp: totals.lodgingInGbp,
-        brl: totals.lodgingInGbp * gbpToBrl,
-        usd: totals.lodgingInGbp * gbpToUsd,
-      },
-      {
-        label: "Custo total da viagem",
-        gbp: totals.totalCost,
-        brl: totals.totalCost * gbpToBrl,
-        usd: totals.totalCost * gbpToUsd,
+        label: "Compra de USD informada",
+        gbp: totals.usdPurchaseCostBrl / gbpToBrl,
+        brl: totals.usdPurchaseCostBrl,
+        usd: toNumber(form.usdAmount),
       },
       {
         label: "USD convertido para GBP",
@@ -215,10 +233,28 @@ function App() {
         usd: totals.convertedUsd * gbpToUsd,
       },
       {
-        label: "Valor ainda necessário",
+        label: "Valor ainda necessário para dólar",
         gbp: totals.amountNeeded,
         brl: totals.amountNeeded * gbpToBrl,
         usd: totals.amountNeeded * gbpToUsd,
+      },
+      {
+        label: "Passagem",
+        gbp: totals.flightInGbp,
+        brl: toNumber(form.flightBrl),
+        usd: totals.flightInGbp * gbpToUsd,
+      },
+      {
+        label: "Hospedagem",
+        gbp: totals.lodgingInGbp,
+        brl: toNumber(form.lodgingBrl),
+        usd: totals.lodgingInGbp * gbpToUsd,
+      },
+      {
+        label: "Meta total para poupar",
+        gbp: totals.totalSavingTargetBrl / gbpToBrl,
+        brl: totals.totalSavingTargetBrl,
+        usd: totals.totalSavingTargetBrl / (gbpToBrl / gbpToUsd),
       },
       {
         label: "Poupança mensal",
@@ -226,13 +262,19 @@ function App() {
         brl: totals.monthlySavingBrl,
         usd: totals.monthlySavingUsd,
       },
+      {
+        label: "Custo total da viagem",
+        gbp: totals.totalTripCostGbp,
+        brl: totals.totalTripCostBrl,
+        usd: totals.totalTripCostGbp * gbpToUsd,
+      },
     ];
-  }, [gbpToBrlRate, gbpToUsdRate, totals]);
+  }, [form.flightBrl, form.lodgingBrl, gbpToBrlRate, gbpToUsdRate, totals]);
 
-  const totalCostBrl = totals.totalCost * (gbpToBrlRate ?? 0);
-  const totalCostUsd = totals.totalCost * (gbpToUsdRate ?? 0);
-  const amountNeededBrl = totals.amountNeeded * (gbpToBrlRate ?? 0);
-  const amountNeededUsd = totals.amountNeeded * (gbpToUsdRate ?? 0);
+  const totalCostBrl = totals.totalTripCostBrl;
+  const totalCostUsd = totals.totalTripCostGbp * gbpToUsdRate;
+  const amountNeededBrl = totals.amountNeeded * gbpToBrlRate;
+  const amountNeededUsd = totals.amountNeeded * gbpToUsdRate;
 
   const onInputChange = (key: keyof TripForm, value: string) => {
     if (value === "") {
@@ -247,18 +289,33 @@ function App() {
 
     setForm((current) => ({
       ...current,
-      [key]: key === "people" ? Math.floor(Math.max(1, parsed)) : parsed,
+      [key]:
+        key === "people"
+          ? Math.floor(Math.max(1, parsed))
+          : key === "tripYear"
+          ? Math.floor(Math.max(new Date().getFullYear(), parsed))
+          : parsed,
     }));
   };
 
   const onInputBlur = (key: keyof TripForm) => {
     setForm((current) => {
       if (current[key] !== "") return current;
-      return { ...current, [key]: key === "people" ? 1 : 0 };
+      return {
+        ...current,
+        [key]:
+          key === "people"
+            ? 1
+            : key === "tripMonth"
+            ? defaultMonth
+            : key === "tripYear"
+            ? defaultYear
+            : 0,
+      };
     });
   };
 
-  const monthsLabel = monthsInfo.monthsRemaining === 1 ? "mês" : "meses";
+  const monthsLabel = targetInfo.monthsRemaining === 1 ? "mês" : "meses";
 
   return (
     <main className="app-shell">
@@ -269,8 +326,8 @@ function App() {
         <p className="eyebrow">Planejamento de Viagem</p>
         <h1>Help My Trip!</h1>
         <p className="subtitle">
-          Estime custos diários, converta USD para GBP na cotação atual e descubra quanto
-          precisa poupar por mês.
+          Estime custos da viagem, veja o total em BRL e descubra quanto ainda precisa comprar
+          em dólar para gastos do dia a dia.
         </p>
       </header>
 
@@ -280,6 +337,19 @@ function App() {
           <div className="form-grid">
             <Field label="Pessoas" value={form.people} onChange={(v) => onInputChange("people", v)} onBlur={() => onInputBlur("people")} step={1} min={1} />
             <Field label="Dias da viagem" value={form.tripDays} onChange={(v) => onInputChange("tripDays", v)} onBlur={() => onInputBlur("tripDays")} step={1} />
+            <MonthField
+              label="Mês da viagem"
+              value={Math.min(12, Math.max(1, Math.floor(toNumber(form.tripMonth, defaultMonth))))}
+              onChange={(value) => setForm((current) => ({ ...current, tripMonth: value }))}
+            />
+            <Field
+              label="Ano da viagem"
+              value={form.tripYear}
+              onChange={(v) => onInputChange("tripYear", v)}
+              onBlur={() => onInputBlur("tripYear")}
+              step={1}
+              min={new Date().getFullYear()}
+            />
             <Field label="Transporte diário (GBP)" value={form.transportDaily} onChange={(v) => onInputChange("transportDaily", v)} onBlur={() => onInputBlur("transportDaily")} />
             <Field label="Alimentação por refeição (GBP)" value={form.mealCost} onChange={(v) => onInputChange("mealCost", v)} onBlur={() => onInputBlur("mealCost")} />
             <Field label="Refeições por dia" value={form.mealsPerDay} onChange={(v) => onInputChange("mealsPerDay", v)} onBlur={() => onInputBlur("mealsPerDay")} step={1} />
@@ -300,23 +370,18 @@ function App() {
         <div className="card results">
           <h2>Resumo</h2>
           <p className="rate">
-            {rateError
-              ? `${rateError} Taxas usadas: 1 GBP = ${formatCurrency(gbpToUsdRate ?? 0, "USD")} e ${formatCurrency(
-                  gbpToBrlRate ?? 0,
-                  "BRL"
-                )}.`
-              : gbpToUsdRate && gbpToBrlRate
-              ? `Cotação atual: 1 GBP = ${formatCurrency(gbpToUsdRate, "USD")} e ${formatCurrency(gbpToBrlRate, "BRL")}${
-                  rateDate ? ` (Frankfurter, ${rateDate})` : ""
-                }`
-              : "Carregando cotações GBP → USD/BRL..."}
+            {`Cotação fixa: 1 GBP = ${formatCurrency(gbpToUsdRate, "USD")} e ${formatCurrency(
+              gbpToBrlRate,
+              "BRL"
+            )} (Frankfurter, ${rateDate}).`}
           </p>
 
           <div className="kpis">
             <article>
               <p>Custo total da viagem</p>
-              <strong>{formatCurrency(totals.totalCost, "GBP")}</strong>
-              <p className="kpi-sub">{`≈ ${formatCurrency(totalCostBrl, "BRL")} | ${formatCurrency(totalCostUsd, "USD")}`}</p>
+              <strong>{formatCurrency(totalCostBrl, "BRL")}</strong>
+              <p className="kpi-sub">Inclui também o valor informado para compra de USD.</p>
+              <p className="kpi-sub">{`≈ ${formatCurrency(totals.totalTripCostGbp, "GBP")} | ${formatCurrency(totalCostUsd, "USD")}`}</p>
             </article>
             <article>
               <p>USD convertido para GBP</p>
@@ -327,11 +392,13 @@ function App() {
               <strong className={totals.amountNeeded > 0 ? "positive" : "neutral"}>
                 {formatCurrency(totals.amountNeeded, "GBP")}
               </strong>
+              <p className="kpi-sub">Somente para compras, comida, transporte e ingressos.</p>
               <p className="kpi-sub">{`≈ ${formatCurrency(amountNeededBrl, "BRL")} | ${formatCurrency(amountNeededUsd, "USD")}`}</p>
             </article>
             <article>
-              <p>Poupança mensal até novembro</p>
+              <p>{`Poupança mensal até ${monthNames[targetInfo.targetMonth - 1]} de ${targetInfo.targetYear}`}</p>
               <strong className={totals.amountNeeded > 0 ? "positive" : "neutral"}>{formatCurrency(totals.monthlySavingBrl, "BRL")}</strong>
+              <p className="kpi-sub">Inclui passagem, hospedagem, compra de USD e complemento necessário.</p>
               <p className="kpi-sub">
                 {`≈ ${formatCurrency(totals.monthlySavingGbp, "GBP")} | ${formatCurrency(totals.monthlySavingUsd, "USD")}`}
               </p>
@@ -364,8 +431,8 @@ function App() {
 
           <p className="meta">
             {totals.amountNeeded > 0
-              ? `Você tem ${monthsInfo.monthsRemaining} ${monthsLabel} até ${monthNames[10]} de ${monthsInfo.targetYear} para atingir a meta.`
-              : `Com o valor convertido de USD, sua meta até ${monthNames[10]} de ${monthsInfo.targetYear} já está coberta.`}
+              ? `Você tem ${targetInfo.monthsRemaining} ${monthsLabel} até ${monthNames[targetInfo.targetMonth - 1]} de ${targetInfo.targetYear} para atingir a meta.`
+              : `Com o valor convertido de USD, sua meta até ${monthNames[targetInfo.targetMonth - 1]} de ${targetInfo.targetYear} já está coberta.`}
           </p>
         </div>
       </section>
@@ -395,9 +462,31 @@ function Field({ label, value, onChange, onBlur, step = 0.01, min = 0, className
         onChange={(event) => onChange(event.target.value)}
         onBlur={onBlur}
         onWheel={(event) => {
-          event.preventDefault();
+          event.currentTarget.blur();
         }}
       />
+    </label>
+  );
+}
+
+type MonthFieldProps = {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  className?: string;
+};
+
+function MonthField({ label, value, onChange, className }: MonthFieldProps) {
+  return (
+    <label className={className}>
+      {label}
+      <select value={value} onChange={(event) => onChange(Number(event.target.value))}>
+        {monthNames.map((month, index) => (
+          <option key={month} value={index + 1}>
+            {month}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
